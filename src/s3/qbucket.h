@@ -24,60 +24,62 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef BUCKET_H
-#define BUCKET_H
+#ifndef QBUCKET_H
+#define QBUCKET_H
 
-#include "abstractapi.h"
+#include "qabstracts3model.h"
+
 #include <QtCore/QVariantMap>
 #include <QtCore/QVariantList>
 
-class Bucket : public AbstractApi
+class S3_EXPORT QBucket : public QAbstractS3Model
 {
     Q_OBJECT
-    Q_PROPERTY(QString name READ name WRITE name NOTIFY nameChanged)
-    Q_PROPERTY(QString prefix READ prefix NOTIFY prefixChanged)
-    Q_PROPERTY(QString maker READ maker NOTIFY makerChanged)
-    Q_PROPERTY(int maxKeys READ maxKeys NOTIFY maxKeysChanged)
-    Q_PROPERTY(bool isTruncated READ isTruncated NOTIFY isTruncatedChanged)
-    Q_PROPERTY(QVariantList contents READ contents NOTIFY contentsChanged)
+    Q_PROPERTY(QString name READ name WRITE setName NOTIFY nameChanged)
+    Q_PROPERTY(QString delimiter READ delimiter WRITE setDelimiter NOTIFY delimiterChanged)
+    Q_PROPERTY(QString marker READ marker WRITE setMarker NOTIFY markerChanged)
+    Q_PROPERTY(int maxKeys READ maxKeys WRITE setMaxKeys NOTIFY maxKeysChanged)
+    Q_PROPERTY(QString prefix READ prefix WRITE setPrefix NOTIFY prefixChanged)
+    Q_PROPERTY(bool isTruncated READ isTruncated NOTIFY truncatedChanged)
 public:
-    explicit Bucket(QObject *parent = 0);
+    explicit QBucket(QObject *parent = 0);
+
+    virtual QHash<int, QByteArray> roleNames() const;
+
+    const QString &name() const;
+    const QString &delimiter() const;
+    const QString &marker() const;
+    int maxKeys() const;
+    const QString &prefix() const;
+    bool isTruncated() const;
+
+public slots:
+    void setName(const QString &name);
+    void setDelimiter(const QString &delmiter);
+    void setMarker(const QString &marker);
+    void setMaxKeys(int maxKeys);
+    void setPrefix(const QString &prefix);
+
+private slots:
+    void setTruncated(bool trunctated);
+
+public slots:
+    void load();
 
 signals:
     void nameChanged(const QString &name);
-    void prefixChanged(const QString &prefix);
-    void makerChanged(const QString &maker);
+    void delimiterChanged(const QString &delimiter);
+    void markerChanged(const QString &marker);
     void maxKeysChanged(int maxKeys);
-    void isTruncatedChanged(bool isTruncated);
-    void contentsChanged(const QVariantList &contents);
+    void prefixChanged(const QString &prefix);
+    void truncatedChanged(bool isTruncated);
 
 protected:
-    void done(const QByteArray &data);
+    void finished(QIODevice *io);
 
-private slots:
-    void get();
-
-
-#define ADD_PROPERTY(type, name, type2) \
-public: \
-    type name() const { return m_##name; } \
-    void name(type name) { \
-        if (m_##name == name) return; \
-        m_##name = name; \
-        emit name##Changed(name); \
-    } \
-private: \
-    type2 m_##name;
-
-    ADD_PROPERTY(const QString &, name, QString)
-    ADD_PROPERTY(const QString &, prefix, QString)
-    ADD_PROPERTY(const QString &, maker, QString)
-    ADD_PROPERTY(int, maxKeys, int)
-    ADD_PROPERTY(bool, isTruncated, bool)
-    ADD_PROPERTY(const QVariantList &, contents, QVariantList)
-#undef ADD_PROPERTY
-
-
+private:
+    class Private;
+    Private *d;
 };
 
-#endif // BUCKET_H
+#endif // QBUCKET_H

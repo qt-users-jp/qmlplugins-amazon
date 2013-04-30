@@ -1,32 +1,7 @@
-/* Copyright (c) 2012 Silk Project.
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of the Silk nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL SILK BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-
-#include "abstractapi.h"
+#include "qabstracts3model.h"
 
 #include "qaccount.h"
+#include "qs3networkaccessmanager.h"
 
 #include <QtCore/QCryptographicHash>
 #include <QtCore/QMessageAuthenticationCode>
@@ -34,19 +9,16 @@
 #include <QtCore/QDateTime>
 #include <QtCore/QLocale>
 #include <QtCore/QRegularExpression>
-#include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkRequest>
 #include <QtNetwork/QNetworkReply>
 
 
-QNetworkAccessManager *AbstractApi::networkAccessManager = 0;
-
-class AbstractApi::Private
+class QAbstractS3Model::Private
 {
 public:
-    Private(AbstractApi *parent);
+    Private(QAbstractS3Model *parent);
 
-    void exec(QNetworkRequest request, QNetworkAccessManager::Operation operation, const QByteArray &data);
+    void start(const QUrl &url, QNetworkAccessManager::Operation operation, const QByteArray &data = QByteArray());
 
 private:
     QByteArray toString(const QDateTime &dt) const;
@@ -54,15 +26,17 @@ private:
     QByteArray toString(const QUrl &url) const;
 
 private:
-    AbstractApi *q;
+    QAbstractS3Model *q;
 
 public:
     QAccount *account;
     bool loading;
     int progress;
+
+    QList<QVariantMap> data;
 };
 
-AbstractApi::Private::Private(AbstractApi *parent)
+QAbstractS3Model::Private::Private(QAbstractS3Model *parent)
     : q(parent)
     , account(0)
     , loading(false)
@@ -70,7 +44,7 @@ AbstractApi::Private::Private(AbstractApi *parent)
 {
 }
 
-QByteArray AbstractApi::Private::toString(const QDateTime &dt) const
+QByteArray QAbstractS3Model::Private::toString(const QDateTime &dt) const
 {
     QDateTime utc(dt);
     utc.setTimeSpec(Qt::UTC);
@@ -85,7 +59,7 @@ QByteArray AbstractApi::Private::toString(const QDateTime &dt) const
     return QStringLiteral("%1 %2%3").arg(locale.toString(dt, QStringLiteral("ddd, dd MMM yyyy hh:mm:ss"))).arg(sign).arg(timezoneHours * 100 + timezoneMinutes, 4, 10, QLatin1Char('0')).toLatin1();
 }
 
-QByteArray AbstractApi::Private::toString(QNetworkAccessManager::Operation operation) const
+QByteArray QAbstractS3Model::Private::toString(QNetworkAccessManager::Operation operation) const
 {
     static QMap<QNetworkAccessManager::Operation, QByteArray> map;
     if (map.isEmpty()) {
@@ -98,8 +72,9 @@ QByteArray AbstractApi::Private::toString(QNetworkAccessManager::Operation opera
     return map.value(operation);
 }
 
-QByteArray AbstractApi::Private::toString(const QUrl &url) const
+QByteArray QAbstractS3Model::Private::toString(const QUrl &url) const
 {
+//    qDebug() << Q_FUNC_INFO << __LINE__ << url;
     QByteArray ret;
     QRegularExpression bucket(QStringLiteral("^([a-z0-9\\-]+)\\.s3[a-z0-9\\-]*\\.amazonaws\\.com$"));
     QRegularExpressionMatch match = bucket.match(url.host());
@@ -108,19 +83,20 @@ QByteArray AbstractApi::Private::toString(const QUrl &url) const
         ret.append(match.captured(1).toUtf8());
     }
     ret.append(url.path().toUtf8());
-    QString query = url.query();
-    if (query.indexOf('&') < query.indexOf('=')) {
-        ret.append(QStringLiteral("?%1").arg(query.left(query.indexOf(QStringLiteral("&")))).toUtf8());
-    }
+//    QString query = url.query();
+//    if (query.indexOf('&') < query.indexOf('=')) {
+//        ret.append(QStringLiteral("?%1").arg(query.left(query.indexOf(QStringLiteral("&")))).toUtf8());
+//    }
+//    qDebug() << Q_FUNC_INFO << __LINE__ << ret;
     return ret;
 }
 
-void AbstractApi::Private::exec(QNetworkRequest request, QNetworkAccessManager::Operation operation, const QByteArray &data)
+void QAbstractS3Model::Private::start(const QUrl &url, QNetworkAccessManager::Operation operation, const QByteArray &data)
 {
-    if (!account) {
-        qWarning() << "account is not set.";
-        return;
-    }
+    if (!account) return;
+    if (account->awsAccessKeyId().isEmpty()) return;
+    if (account->awsSecretAccessKey().isEmpty()) return;
+
     q->setLoading(true);
     QNetworkReply *reply = 0;
 
@@ -129,6 +105,7 @@ void AbstractApi::Private::exec(QNetworkRequest request, QNetworkAccessManager::
     if (!data.isEmpty())
         contentMd5 = QCryptographicHash::hash(data, QCryptographicHash::Md5).toHex();
 //    qDebug() << Q_FUNC_INFO << __LINE__ << contentMd5;
+    QNetworkRequest request(url);
     QByteArray contentType = request.header(QNetworkRequest::ContentTypeHeader).toByteArray();
 //    qDebug() << Q_FUNC_INFO << __LINE__ << contentType;
     QByteArray date = toString(QDateTime::currentDateTime());
@@ -159,24 +136,21 @@ void AbstractApi::Private::exec(QNetworkRequest request, QNetworkAccessManager::
     request.setRawHeader("Date", date);
     request.setRawHeader("Authorization", authorization);
 
-    if (!networkAccessManager)
-        setNetworkAccessManager(new QNetworkAccessManager);
-
     switch (operation) {
     case QNetworkAccessManager::HeadOperation:
-        reply = networkAccessManager->head(request);
+        reply = QS3NetworkAccessManager::instance().head(request);
         break;
     case QNetworkAccessManager::GetOperation:
-        reply = networkAccessManager->get(request);
+        reply = QS3NetworkAccessManager::instance().get(request);
         break;
     case QNetworkAccessManager::PostOperation:
-        reply = networkAccessManager->post(request, "");
+        reply = QS3NetworkAccessManager::instance().post(request, data);
         break;
     case QNetworkAccessManager::PutOperation:
-        reply = networkAccessManager->put(request, "");
+        reply = QS3NetworkAccessManager::instance().put(request, data);
         break;
     case QNetworkAccessManager::DeleteOperation:
-        reply = networkAccessManager->deleteResource(request);
+        reply = QS3NetworkAccessManager::instance().deleteResource(request);
         break;
     default:
         break;
@@ -185,12 +159,21 @@ void AbstractApi::Private::exec(QNetworkRequest request, QNetworkAccessManager::
     q->setProgress(0);
 
     connect(reply, &QNetworkReply::finished, [this, reply]() {
-        q->done(reply);
+        int httpStatusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        switch (httpStatusCode) {
+        case 200:
+            q->finished(reply);
+            q->setLoading(false);
+            break;
+        case 307:
+            start(reply->attribute(QNetworkRequest::RedirectionTargetAttribute).toUrl(), reply->operation());
+            break;
+        }
         reply->deleteLater();
-        q->setLoading(false);
     });
     connect(reply, static_cast<void (QNetworkReply::*)(QNetworkReply::NetworkError)>(&QNetworkReply::error), [this, reply](QNetworkReply::NetworkError error) {
         qDebug() << Q_FUNC_INFO << __LINE__ << error << reply->errorString();
+        qDebug() << Q_FUNC_INFO << __LINE__ << reply->readAll();
     });
     connect(reply, &QNetworkReply::downloadProgress, [this](qint64 bytesReceived, qint64 bytesTotal) {
         if (bytesTotal > 0)
@@ -198,57 +181,89 @@ void AbstractApi::Private::exec(QNetworkRequest request, QNetworkAccessManager::
     });
 }
 
-AbstractApi::AbstractApi(QObject *parent)
-    : QObject(parent)
+QAbstractS3Model::QAbstractS3Model(QObject *parent)
+    : QAbstractListModel(parent)
     , d(new Private(this))
 {
-    connect(this, &AbstractApi::destroyed, [d]() { delete d; });
+    connect(this, &QAbstractS3Model::destroyed, [d]() { delete d; });
 }
 
-QAccount *AbstractApi::account() const
+int QAbstractS3Model::rowCount(const QModelIndex &parent) const
+{
+    Q_UNUSED(parent)
+    return d->data.count();
+}
+
+QVariant QAbstractS3Model::data(const QModelIndex &index, int role) const
+{
+    QVariant ret;
+    int row = index.row();
+    if (0 <= row && row < d->data.count()) {
+        ret = d->data.at(row).value(QString::fromUtf8(roleNames().value(role)));
+    }
+    return ret;
+}
+
+QVariantMap QAbstractS3Model::get(int i) const
+{
+    QVariantMap ret;
+    if (0 <= i && i < d->data.count()) {
+        ret = d->data.at(i);
+    }
+    return ret;
+}
+
+QAccount *QAbstractS3Model::account() const
 {
     return d->account;
 }
 
-void AbstractApi::setAccount(QAccount *account)
+void QAbstractS3Model::setAccount(QAccount *account)
 {
     if (d->account == account) return;
     d->account = account;
     emit accountChanged(account);
 }
 
-bool AbstractApi::loading() const
+bool QAbstractS3Model::loading() const
 {
     return d->loading;
 }
 
-void AbstractApi::setLoading(bool loading)
+void QAbstractS3Model::setLoading(bool loading)
 {
     if (d->loading == loading) return;
     d->loading = loading;
     emit loadingChanged(loading);
 }
 
-int AbstractApi::progress() const
+int QAbstractS3Model::progress() const
 {
     return d->progress;
 }
 
-void AbstractApi::setProgress(int progress)
+void QAbstractS3Model::setProgress(int progress)
 {
     if (d->progress == progress) return;
     d->progress = progress;
     emit progressChanged(progress);
 }
 
-void AbstractApi::setNetworkAccessManager(QNetworkAccessManager *nam)
+int QAbstractS3Model::count() const
 {
-    if (networkAccessManager && !networkAccessManager->parent())
-        networkAccessManager->deleteLater();
-    networkAccessManager = nam;
+    return d->data.count();
 }
 
-void AbstractApi::exec(QNetworkRequest request, QNetworkAccessManager::Operation operation, const QByteArray &data)
+void QAbstractS3Model::start(const QUrl &url, QNetworkAccessManager::Operation operation, const QByteArray &data)
 {
-    d->exec(request, operation, data);
+    d->start(url, operation, data);
+}
+
+void QAbstractS3Model::append(const QList<QVariantMap> &data)
+{
+    if (data.isEmpty()) return;
+    beginInsertRows(QModelIndex(), d->data.length(), d->data.length() + data.length() - 1);
+    d->data.append(data);
+    endInsertRows();
+    emit countChanged(d->data.count());
 }

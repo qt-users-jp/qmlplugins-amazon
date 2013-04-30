@@ -24,55 +24,41 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ABSTRACTAPI_H
-#define ABSTRACTAPI_H
+#ifndef SERVICE_H
+#define SERVICE_H
 
 #include "s3_global.h"
+#include "qabstracts3model.h"
+#include <QtCore/QVariantMap>
+#include <QtCore/QVariantList>
 
-#include <QtCore/QDebug>
-#include <QtCore/QObject>
-#include <QtCore/QUrl>
-#include <QtNetwork/QNetworkAccessManager>
-#include <QtNetwork/QNetworkRequest>
-#include <QtCore/QXmlStreamReader>
-
-class QAccount;
-
-class S3_EXPORT AbstractApi : public QObject
+class S3_EXPORT QService : public QAbstractS3Model
 {
     Q_OBJECT
-    Q_PROPERTY(QAccount *account READ account WRITE setAccount NOTIFY accountChanged)
-    Q_PROPERTY(bool loading READ loading NOTIFY loadingChanged)
-    Q_PROPERTY(int progress READ progress NOTIFY progressChanged)
+    Q_PROPERTY(QVariantMap owner READ owner NOTIFY ownerChanged)
 public:
-    explicit AbstractApi(QObject *parent = 0);
+    explicit QService(QObject *parent = 0);
 
-    static void setNetworkAccessManager(QNetworkAccessManager *networkAccessManager);
+    virtual QHash<int, QByteArray> roleNames() const;
 
-    QAccount *account() const;
-    bool loading() const;
-    int progress() const;
+    const QVariantMap &owner() const;
+
+private slots:
+    void setOwner(const QVariantMap &owner);
 
 public slots:
-    void setAccount(QAccount *account);
+    void load();
 
 signals:
-    void accountChanged(QAccount *account);
-    void loadingChanged(bool loading);
-    void progressChanged(int progress);
+    void ownerChanged(const QVariantMap &owner);
 
 protected:
-    void exec(QNetworkRequest request, QNetworkAccessManager::Operation method, const QByteArray &data = QByteArray());
-    virtual void done(QIODevice *io) = 0;
+    void finished(QIODevice *io);
 
 private:
-    void setLoading(bool loading);
-    void setProgress(int progress);
-
+    Q_DISABLE_COPY(QService)
     class Private;
     Private *d;
-
-    static QNetworkAccessManager *networkAccessManager;
 };
 
-#endif // ABSTRACTAPI_H
+#endif // SERVICE_H

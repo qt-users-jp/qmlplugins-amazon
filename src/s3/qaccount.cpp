@@ -24,44 +24,56 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef S3_H
-#define S3_H
+#include "qaccount.h"
 
-#include <QtCore/QObject>
+#include <QtCore/QDebug>
 
-class S3 : public QObject
+class QAccount::Private
 {
-    Q_OBJECT
-
-    Q_PROPERTY(QByteArray awsAccessKeyId READ awsAccessKeyId WRITE awsAccessKeyId NOTIFY awsAccessKeyIdChanged)
-    Q_PROPERTY(QByteArray awsSecretAccessKey READ awsSecretAccessKey WRITE awsSecretAccessKey NOTIFY awsSecretAccessKeyChanged)
-
 public:
-    explicit S3(QObject *parent = 0);
-
-signals:
-    void awsAccessKeyIdChanged(const QByteArray &awsAccessKeyId);
-    void awsSecretAccessKeyChanged(const QByteArray &awsSecretAccessKey);
+    Private(QAccount *parent);
 
 private:
-    class Private;
-    Private *d;
+    QAccount *q;
 
-#define ADD_PROPERTY(type, name, type2) \
-public: \
-    type name() const { return m_##name; } \
-    void name(type name) { \
-        if (m_##name == name) return; \
-        m_##name = name; \
-        emit name##Changed(name); \
-    } \
-private: \
-    type2 m_##name;
-
-    ADD_PROPERTY(const QByteArray &, awsAccessKeyId, QByteArray)
-    ADD_PROPERTY(const QByteArray &, awsSecretAccessKey, QByteArray)
-#undef ADD_PROPERTY
-
+public:
+    QByteArray awsAccessKeyId;
+    QByteArray awsSecretAccessKey;
 };
 
-#endif // S3_H
+QAccount::Private::Private(QAccount *parent)
+    : q(parent)
+{
+}
+
+QAccount::QAccount(QObject *parent)
+    : QObject(parent)
+    , d(new Private(this))
+{
+    connect(this, &QAccount::destroyed, [d]() { delete d; });
+}
+
+const QByteArray &QAccount::awsAccessKeyId() const
+{
+    return d->awsAccessKeyId;
+}
+
+const QByteArray &QAccount::awsSecretAccessKey() const
+{
+    return d->awsSecretAccessKey;
+}
+
+void QAccount::setAwsAccessKeyId(const QByteArray &awsAccessKeyId)
+{
+    if (d->awsAccessKeyId == awsAccessKeyId) return;
+    d->awsAccessKeyId = awsAccessKeyId;
+    emit awsAccessKeyIdChanged(awsAccessKeyId);
+}
+
+void QAccount::setAwsSecretAccessKey(const QByteArray &awsSecretAccessKey)
+{
+    if (d->awsSecretAccessKey == awsSecretAccessKey) return;
+    d->awsSecretAccessKey = awsSecretAccessKey;
+    emit awsSecretAccessKeyChanged(awsSecretAccessKey);
+}
+

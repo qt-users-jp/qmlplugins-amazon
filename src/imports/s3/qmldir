@@ -1,0 +1,3 @@
+module QtAmazonS3
+plugin declarative_amazons3
+typeinfo plugins.qmltypes

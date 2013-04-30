@@ -24,48 +24,27 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef SERVICE_H
-#define SERVICE_H
+#include <QtQml/QQmlExtensionPlugin>
+#include <QtQml/qqml.h>
 
-#include "abstractapi.h"
-#include <QtCore/QVariantMap>
-#include <QtCore/QVariantList>
+#include <QtAmazonS3/QAccount>
+#include <QtAmazonS3/QService>
+#include <QtAmazonS3/QBucket>
 
-class Service : public AbstractApi
+class QmlAmazonS3Plugin : public QQmlExtensionPlugin
 {
     Q_OBJECT
-    Q_PROPERTY(QVariantMap owner READ owner NOTIFY ownerChanged)
-    Q_PROPERTY(QVariantList buckets READ buckets NOTIFY bucketsChanged)
+    Q_PLUGIN_METADATA(IID "org.qt-project.Qt.QQmlExtensionInterface")
+
 public:
-    explicit Service(QObject *parent = 0);
-
-signals:
-    void ownerChanged(const QVariantMap &owner);
-    void bucketsChanged(const QVariantList &buckets);
-
-protected:
-    void done(const QByteArray &data);
-
-private slots:
-    void get();
-
-
-#define ADD_PROPERTY(type, name, type2) \
-public: \
-    type name() const { return m_##name; } \
-    void name(type name) { \
-        if (m_##name == name) return; \
-        m_##name = name; \
-        emit name##Changed(name); \
-    } \
-private: \
-    type2 m_##name;
-
-    ADD_PROPERTY(const QVariantMap &, owner, QVariantMap)
-    ADD_PROPERTY(const QVariantList &, buckets, QVariantList)
-#undef ADD_PROPERTY
-
-
+    virtual void registerTypes(const char *uri)
+    {
+        Q_ASSERT(QLatin1String(uri) == QLatin1String("QtAmazonS3"));
+        // @uri QtAmazonS3
+        qmlRegisterType<QAccount>(uri, 0, 1, "Account");
+        qmlRegisterType<QService>(uri, 0, 1, "Service");
+        qmlRegisterType<QBucket>(uri, 0, 1, "Bucket");
+    }
 };
 
-#endif // SERVICE_H
+#include "main.moc"

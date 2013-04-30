@@ -1,6 +1,6 @@
 /* Copyright (c) 2012 Silk Project.
  * All rights reserved.
- *
+ * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *     * Redistributions of source code must retain the above copyright
@@ -11,7 +11,7 @@
  *     * Neither the name of the Silk nor the
  *       names of its contributors may be used to endorse or promote products
  *       derived from this software without specific prior written permission.
- *
+ * 
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -24,28 +24,37 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef PLUGIN_H
-#define PLUGIN_H
+#ifndef QACCOUNT_H
+#define QACCOUNT_H
 
-#include <QtQml/QQmlExtensionPlugin>
-#include <QtQml/qqml.h>
+#include "s3_global.h"
 
-#include "s3.h"
-#include "service.h"
-#include "bucket.h"
+#include <QtCore/QObject>
 
-class Plugin : public QQmlExtensionPlugin
+class S3_EXPORT QAccount : public QObject
 {
     Q_OBJECT
-    Q_PLUGIN_METADATA(IID "org.qt-project.Qt.QQmlExtensionInterface");
+
+    Q_PROPERTY(QByteArray awsAccessKeyId READ awsAccessKeyId WRITE setAwsAccessKeyId NOTIFY awsAccessKeyIdChanged)
+    Q_PROPERTY(QByteArray awsSecretAccessKey READ awsSecretAccessKey WRITE setAwsSecretAccessKey NOTIFY awsSecretAccessKeyChanged)
 
 public:
-    void registerTypes(const char *uri) {
-        // @uri me.qtquick.Amazon.S3
-        qmlRegisterType<S3>(uri, 0, 1, "Account");
-        qmlRegisterType<Service>(uri, 0, 1, "Service");
-        qmlRegisterType<Bucket>(uri, 0, 1, "Bucket");
-    }
+    explicit QAccount(QObject *parent = 0);
+
+    const QByteArray &awsAccessKeyId() const;
+    const QByteArray &awsSecretAccessKey() const;
+
+public slots:
+    void setAwsAccessKeyId(const QByteArray &awsAccessKeyId);
+    void setAwsSecretAccessKey(const QByteArray &awsSecretAccessKey);
+
+signals:
+    void awsAccessKeyIdChanged(const QByteArray &awsAccessKeyId);
+    void awsSecretAccessKeyChanged(const QByteArray &awsSecretAccessKey);
+
+private:
+    class Private;
+    Private *d;
 };
 
-#endif // PLUGIN_H
+#endif // QACCOUNT_H

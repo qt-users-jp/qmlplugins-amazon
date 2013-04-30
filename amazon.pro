@@ -1,4 +1,3 @@
-TEMPLATE = subdirs
-SUBDIRS = src
+load(qt_parts)
 
-OTHER_FILES += LICENSE README s3curl.pl
+OTHER_FILES += LICENSE README .qmake.conf sync.profile s3curl.pl

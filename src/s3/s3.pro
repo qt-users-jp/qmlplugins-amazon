@@ -1,31 +1,22 @@
-TEMPLATE = lib
-CONFIG += plugin
+TARGET = QtAmazonS3
+MODULE = amazons3
+QT = core network
 
-QT = core network qml
+load(qt_module)
 
-TARGET = s3-qml
-TARGETPATH = me/qtquick/Amazon/S3
+PUBLIC_HEADERS = qaccount.h qservice.h qbucket.h
+HEADERS = $$PUBLIC_HEADERS \
+    qabstracts3model.h \
+    qs3networkaccessmanager.h
+SOURCES = qaccount.cpp qservice.cpp qbucket.cpp \
+    qabstracts3model.cpp \
+    qs3networkaccessmanager.cpp
+
+DEFINES += S3_LIBRARY
 
 HEADERS += \
-    plugin.h \
-    s3.h \
-    service.h \
     abstractapi.h \
-    hmac_sha1.h \
-    bucket.h
+    s3_global.h
 
 SOURCES += \
-    s3.cpp \
-    service.cpp \
-    abstractapi.cpp \
-    hmac_sha1.cpp \
-    bucket.cpp
-
-target.path = $$[QT_INSTALL_QML]/$$TARGETPATH
-
-qmldir.files = qmldir
-qmldir.path = $$[QT_INSTALL_QML]/$$TARGETPATH
-
-INSTALLS = target qmldir
-
-OTHER_FILES += qmldir
+    abstractapi.cpp

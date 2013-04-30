@@ -1,2 +1,0 @@
-module me.qtquick.Amazon.S3
-plugin s3-qml
